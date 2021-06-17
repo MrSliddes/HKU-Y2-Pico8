@@ -1,0 +1,414 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project version="1">
+  <game>
+    <name>Sea Of Stealers</name>
+    <author>Tymon &amp; Ischa</author>
+    <cart>C:\Users\Mr_Sl\AppData\Roaming\pico-8\carts\sos.p8</cart>
+  </game>
+  <entities>
+    <entity name="Notes" enabled="0">
+      <function name="ideas" enabled="0">ideas
+
+  1. 
+  2. </function>
+      <function name="todo" enabled="0">todo
+
+  1. 
+  2. </function>
+    </entity>
+    <entity name="Game" enabled="1">
+      <function name="globals" enabled="1">---globals
+map_x = 0
+map_y = 0
+game_state = 0
+level = 0
+lives = 3
+score = 0
+has_started_level = false
+bullets_player = {}
+bullets_enemies = {}
+enemies = {}
+fps = 30</function>
+      <function name="_init" enabled="1">---init
+function _init()
+end</function>
+      <function name="_update" enabled="1">---update
+function _update()
+  update_player()
+  for i, b in pairs(bullets_player) do update_bullet(b, bullets_player) end
+  for i, b in pairs(bullets_enemies) do update_bullet(b, bullets_enemies) end
+  foreach(enemies, update_enemy)
+  
+  if game_state == 0 then
+    --main menu
+    if btnp(5) then
+      game_state = 1
+      new_level(1)
+    end
+    
+  elseif game_state &gt;= 1 then
+    --game
+    update_level()
+    check_hit_bullets(0)
+    check_hit_bullets(1)
+  end
+end
+
+</function>
+      <function name="_draw" enabled="1">---draw
+function _draw()
+  cls()
+  map(map_x,map_y,0,0,16,16)
+  draw_player()
+  if game_state == 0 then
+    --main
+    rectfill(32, 32, 103, 48, 5)
+    print('sea of ships', 33, 33, 7)
+    print('by tymon &amp; ischa', 33, 41, 7)
+  elseif game_state == 1 then
+    --game
+  end
+  draw_game_ui()
+  foreach(bullets_player, draw_bullet)
+  foreach(bullets_enemies, draw_bullet)
+  foreach(enemies, draw_enemy)
+end
+
+function draw_game_ui()
+  rectfill(0, 0, 128, 8, 0)
+  print('lvl: '..level, 1, 2, 7)
+  local s = '0000'
+  if score &gt; 999 then s = score
+  elseif score &gt; 99 then s = '0'..score
+  elseif score &gt; 9 then s = '00'..score
+  else s = '000'..score end
+  print('score: '..s, 84, 2, 7)
+  rectfill(0, 120, 128, 128, 0)
+  if lives &gt; 0 then spr(3, 1, 120) end
+  if lives &gt; 1 then spr(3, 9, 120) end
+  if lives &gt; 2 then spr(3, 17, 120) end
+  local bcount = 4 - table_length(bullets_player)
+  if bcount &gt; 0 then spr(2, 120, 120) end
+  if bcount &gt; 1 then spr(2, 112, 120) end
+  if bcount &gt; 2 then spr(2, 104, 120) end
+  if bcount &gt; 3 then spr(2, 96, 120) end
+end</function>
+      <function name="functions" enabled="1">---functions (mostly abc sorted)
+
+--terrible code to check bullet collision
+function check_hit_bullets(index)
+  local todelete = {}
+  if index == 0 then --check playerbullet hit enemy
+    for i, b in pairs(bullets_player) do
+      --foreach player bullet check foreach enemy if grid tile is same
+      for j, e in pairs(enemies) do
+        if flr(b.x/8) == flr(e.x/8) and flr(b.y/8) == flr(e.y/8) then
+          --delete enemy and bullet cause collision
+          local d = {b=b, e=e}
+          add(todelete,d)
+          score+=1
+        end
+      end
+    end
+    for i, d in pairs(todelete) do
+      del(bullets_player, d.b.table_index)
+      del(enemies, d.e.table_index)
+    end
+  elseif index == 1 then --check enemybullet hit player
+    
+  end
+end
+
+--table, xpos, ypos, xdir, ydir, live timer
+function create_bullet(x, y, angle, alivet, speed, table)
+  local b = {
+  x = x,
+  y = y,
+  dx = x - x + cos(angle) * speed,
+  dy = y - y + sin(angle) * speed,
+  alive = alivet,
+  table_index = table_length(bullets) + 1
+  }
+  b.x += b.dx * 2
+  b.y += b.dy * 2
+  add(table, b)
+  sfx(0)
+end
+
+--xpos,ypos,dirx,diry,lengthroute,diffeculty
+function create_enemy(x,y,dx,dy,length,diff)
+  local shoot_time = 10
+  local spra = {0,1,2,3}
+  local hp = 1
+  local spd = 1
+  local attack_distance = 40
+  local bullet_speed = 1.5
+  if diff == 0 then
+    shoot_time = 2 * fps
+    spra = {128,129,130,131}
+    hp = 1
+    spd = 1
+    attack_distance = 6 * 8
+  end
+  
+  local e = {
+  x = x,
+  y = y,
+  x1 = x,
+  y1 = y,
+  x2 = x + (dx * length),
+  y2 = y + (dy * length),
+  dx = dx * spd,
+  dy = dy * spd,
+  diff = diff,
+  shoot_time = shoot_time,
+  shoot_timer = shoot_time,
+  sprite_index = spra[1],
+  spra = spra,
+  hp = hp,
+  spd = spd,
+  attack_distance = attack_distance,
+  bullet_speed = bullet_speed,
+  table_index = table_length(enemies) + 1
+  }
+  add(enemies, e)
+end
+
+-- gives distance between 2 points
+function distance(x1,y1,x2,y2)
+  local a = x2 - x1
+  local b = y2 - y1
+  return sqrt(a^2+b^2)
+end
+
+function draw_bullet(b)
+  spr(2, b.x, b.y)
+end
+
+function draw_enemy(e)
+  if e.dx &gt; 0 then e.sprite_index = e.spra[4]
+  elseif e.dx &lt; 0 then e.sprite_index = e.spra[3]
+  elseif e.dy &gt; 0 then e.sprite_index = e.spra[2]
+  elseif e.dy &lt; 0 then e.sprite_index = e.spra[1] end
+  
+  spr(e.sprite_index, e.x, e.y)
+end
+
+function new_level(index)
+  level = index
+  has_started_level = false
+end
+
+--table to remove it from, bullet
+function remove_bullet(table, b)
+  del(table, table[b.table_index])
+  for i, x in pairs(table) do
+    x.table_index = i
+  end
+end
+
+--table to remove it from, enemy
+function remove_enemy(table, e)
+  del(table, table[e.table_index])
+  for i, x in pairs(table) do
+    x.table_index = i
+  end
+end
+
+function table_length(t)
+  local count = 0
+  for _ in pairs(t) do count = count + 1 end
+  return count
+end
+
+function update_bullet(b, table)
+  --bounce x
+  if not solid_area(b.x + b.dx, b.y, 8, 8, 1) then
+    b.x += b.dx
+  else
+    b.dx *= -1
+    sfx(1)
+  end
+  --bounce y
+  if not solid_area(b.x, b.y + b.dy, 8, 8, 1) then
+    b.y += b.dy
+  else
+    b.dy *= -1
+    sfx(1)
+  end
+  --remove bullet
+  b.alive -= 1
+  if b.alive &lt;= 0 then
+    remove_bullet(table, b)
+  end
+  return b
+end
+
+function update_enemy(e)
+  --check line dir
+  if not e.dx == 0 then
+    --x axis
+    if e.dx &lt; 0 and e.x &lt; e.x1 then
+     e.dx = e.spd
+    elseif e.dx &gt; 0 and e.x &gt; e.x2 then
+      e.dx = -e.spd
+    end
+  else
+    --y axis
+    if e.dy &lt; 0 and e.y &lt; e.y1 then
+      e.dy = e.spd
+      elseif e.dy &gt; 0 and e.y &gt; e.y2 then
+      e.dy = -e.spd
+    end
+  end
+  --updatepos
+  e.x += e.dx
+  e.y += e.dy
+  --shooting
+  if e.shoot_timer &gt; 0 then
+    e.shoot_timer -= 1
+  else
+    if distance(p1x,p1y,e.x,e.y) &lt;= e.attack_distance then
+      local angle = atan2(p1x - e.x, p1y - e.y)
+      create_bullet(e.x, e.y, angle, 30 * 4, e.bullet_speed, bullets_enemies)
+      e.shoot_timer = e.shoot_time
+    end
+  end
+end
+
+function update_level()
+  -- level init
+  if not has_started_level then
+    has_started_level = true
+    if(level == 1) then
+      map_x=16
+      map_y=0
+      p1x = 24
+      p1y = 80
+      create_enemy(96, 48, 0, 1, 40, 0)
+    end
+  end
+  
+  --level update
+end
+
+--- other functions
+
+--collision detection, spd cannot be higer than 1!
+--xpos,ypos,width (8pixels = 7),height,flag index
+function hit(x,y,w,h,f)
+  collide=false
+  for i=x,x+w,w do
+    if fget(mget(i/8+map_x,y/8+map_y))==f or
+    fget(mget(i/8+map_x,(y+h)/8+map_y))==f
+      then collide=true
+    end
+  end
+  return collide
+end
+
+function solid(x, y)
+ return fget(mget(x/8+map_x, y/8+map_y)) == 1
+end
+
+function solid_area(x,y,w,h,d)
+  x = x + (w / 2)
+  y = y + (h / 2)
+  return 
+  solid(x-d,y-d) or
+  solid(x+d,y-d) or
+  solid(x-d,y+d) or
+  solid(x+d,y+d)
+end
+
+-- sprite rotation by @fsouchu
+-- rotate a sprite
+-- col 0 is transparent
+-- sx,sy - sprite sheet coords
+-- x,y - screen coords
+-- a - angle
+-- w - width in tiles
+function rspr(sx,sy,x,y,a,w)
+    local ca,sa=cos(a),sin(a)
+    local srcx,srcy
+    local ddx0,ddy0=ca,sa
+    local mask=shl(0xfff8,(w-1))
+    w*=4
+    ca*=w-0.5
+    sa*=w-0.5
+    local dx0,dy0=sa-ca+w,-ca-sa+w
+    w=2*w-1
+    for ix=0,w do
+        srcx,srcy=dx0,dy0
+        for iy=0,w do
+            if band(bor(srcx,srcy),mask)==0 then
+                local c=sget(sx+srcx,sy+srcy)
+                                -- set transparent color here
+                if (c!=0) pset(x+ix,y+iy,c)
+            end
+            srcx-=ddy0
+            srcy+=ddx0
+        end
+        dx0+=ddx0
+        dy0+=ddy0
+    end
+end
+
+</function>
+      <function name="player" enabled="1">---player, credit to elastiskalinjen for dir based movement
+p1angle=0
+p1anglespd = 0.02
+p1speed=0.5
+p1acc=0
+p1x=16
+p1y=24
+p1dx=0
+p1dy=0
+p1_max_bullets = 4
+
+function update_player()
+  --movement
+  if btn(0) then
+    p1angle+=p1anglespd
+  end
+  if btn(1) then
+    p1angle-=p1anglespd
+  end
+  -- p1angle=p1angle%360
+  if btn(2) then
+    p1acc += p1speed
+  end
+  if btn(3) then
+    p1acc -= p1speed
+  end
+  --move in angle dir
+  local dx = cos(p1angle) * p1acc
+  local dy = sin(p1angle) * p1acc
+  -- collision check
+  if hit(p1x+dx,p1y,7,7,1) then
+    dx=0
+  end
+  if hit(p1x,p1y+dy,7,7,1) then
+    dy=0
+  end
+  p1x+=dx
+  p1y+=dy
+  p1acc*=0.6
+ 
+  --shooting
+  if btnp(5) and level &gt; 0 and table_length(bullets_player)+1 &lt;= p1_max_bullets then
+    create_bullet(p1x, p1y, p1angle, 30 * 4, 1.5, bullets_player)
+  end
+end
+
+function draw_player()
+--  spr(1, xpos, ypos)
+  rspr(8,0, p1x, p1y,-p1angle, 1, 1)
+  color(7)
+--print(p1angle)
+--print(p1x)
+--print(p1y)  
+end</function>
+    </entity>
+  </entities>
+</project>

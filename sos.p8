@@ -5,22 +5,29 @@ __lua__
 --by tymon & ischa
 
 --Game
+---globals
 map_x = 0
 map_y = 0
 game_state = 0
 level = 0
 lives = 3
-score = 0
+score = 10
 has_started_level = false
-bullets = {}
+bullets_player = {}
+bullets_enemies = {}
 enemies = {}
+fps = 30
 
+---init
 function _init()
 end
 
+---update
 function _update()
   update_player()
-  foreach(bullets, update_bullet)
+  for i, b in pairs(bullets_player) do update_bullet(b, bullets_player) end
+  for i, b in pairs(bullets_enemies) do update_bullet(b, bullets_enemies) end
+  foreach(enemies, update_enemy)
   
   if game_state == 0 then
     --main menu
@@ -32,23 +39,82 @@ function _update()
   elseif game_state >= 1 then
     --game
     update_level()
+    check_hit_bullets(0)
+    check_hit_bullets(1)
   end
 end
 
 
 
+---draw
 function _draw()
   cls()
   map(map_x,map_y,0,0,16,16)
   draw_player()
+  if game_state == 0 then
+    --main
+    rectfill(32, 32, 103, 48, 5)
+    print('sea of ships', 33, 33, 7)
+    print('by tymon & ischa', 33, 41, 7)
+  elseif game_state == 1 then
+    --game
+  end
   draw_game_ui()
-  foreach(bullets, draw_bullet)
+  foreach(bullets_player, draw_bullet)
+  foreach(bullets_enemies, draw_bullet)
+  foreach(enemies, draw_enemy)
 end
 
----functions
+function draw_game_ui()
+  rectfill(0, 0, 128, 8, 0)
+  print('lvl: '..level, 1, 2, 7)
+  local s = '0000'
+  if score > 999 then s = score
+  elseif score > 99 then s = '0'..score
+  elseif score > 9 then s = '00'..score
+  else s = '000'..score end
+  print('score: '..s, 84, 2, 7)
+  rectfill(0, 120, 128, 128, 0)
+  if lives > 0 then spr(3, 1, 120) end
+  if lives > 1 then spr(3, 9, 120) end
+  if lives > 2 then spr(3, 17, 120) end
+  local bcount = 4 - table_length(bullets_player)
+  if bcount > 0 then spr(2, 120, 120) end
+  if bcount > 1 then spr(2, 112, 120) end
+  if bcount > 2 then spr(2, 104, 120) end
+  if bcount > 3 then spr(2, 96, 120) end
+end
+
+---functions (mostly abc sorted)
+
+--terrible code to check bullet collision
+function check_hit_bullets(index)
+  local todelete = {}
+  if index == 0 then --check playerbullet hit enemy
+    for i, b in pairs(bullets_player) do
+      --foreach player bullet check foreach enemy if grid tile is same
+      for j, e in pairs(enemies) do
+        if flr(b.x/8) == flr(e.x/8) and flr(b.y/8) == flr(e.y/8) then
+          --delete enemy and bullet cause collision
+          local d = {b=b, e=e}
+          add(todelete,d)
+          score+=1
+        end
+      end
+    end
+    for i, d in pairs(todelete) do
+      del(bullets_player, d.b.table_index)
+      del(enemies, d.e.table_index)
+    end
+  elseif index == 1 then --check enemybullet hit player
+    
+  end
+  
+  score +=1
+end
 
 --table, xpos, ypos, xdir, ydir, live timer
-function create_bullet(x, y, angle, alivet, speed)
+function create_bullet(x, y, angle, alivet, speed, table)
   local b = {
   x = x,
   y = y,
@@ -59,27 +125,88 @@ function create_bullet(x, y, angle, alivet, speed)
   }
   b.x += b.dx * 2
   b.y += b.dy * 2
-  add(bullets, b)
+  add(table, b)
+  sfx(0)
+end
+
+--xpos,ypos,dirx,diry,lengthroute,diffeculty
+function create_enemy(x,y,dx,dy,length,diff)
+  local shoot_time = 10
+  local spra = {0,1,2,3}
+  local hp = 1
+  local spd = 1
+  local attack_distance = 40
+  local bullet_speed = 1.5
+  if diff == 0 then
+    shoot_time = 2 * fps
+    spra = {128,129,130,131}
+    hp = 1
+    spd = 1
+    attack_distance = 6 * 8
+  end
+  
+  local e = {
+  x = x,
+  y = y,
+  x1 = x,
+  y1 = y,
+  x2 = x + (dx * length),
+  y2 = y + (dy * length),
+  dx = dx * spd,
+  dy = dy * spd,
+  diff = diff,
+  shoot_time = shoot_time,
+  shoot_timer = shoot_time,
+  sprite_index = spra[1],
+  spra = spra,
+  hp = hp,
+  spd = spd,
+  attack_distance = attack_distance,
+  bullet_speed = bullet_speed,
+  table_index = table_length(enemies) + 1
+  }
+  add(enemies, e)
+end
+
+-- gives distance between 2 points
+function distance(x1,y1,x2,y2)
+  local a = x2 - x1
+  local b = y2 - y1
+  return sqrt(a^2+b^2)
 end
 
 function draw_bullet(b)
   spr(2, b.x, b.y)
 end
 
-function draw_game_ui()
-  rectfill(0, 0, 128, 8, 0)
-  print('lvl: '..level, 1, 2, 7)
-  local s = '0000'
-  print('score: '..s, 84, 2, 7)
-  rectfill(0, 120, 128, 128, 0)
-  if lives > 1 then spr(3, 1, 120) end
-  if lives > 2 then spr(3, 9, 120) end
-  if lives > 3 then spr(3, 17, 120) end
+function draw_enemy(e)
+  if e.dx > 0 then e.sprite_index = e.spra[4]
+  elseif e.dx < 0 then e.sprite_index = e.spra[3]
+  elseif e.dy > 0 then e.sprite_index = e.spra[2]
+  elseif e.dy < 0 then e.sprite_index = e.spra[1] end
+  
+  spr(e.sprite_index, e.x, e.y)
 end
 
 function new_level(index)
   level = index
   has_started_level = false
+end
+
+--table to remove it from, bullet
+function remove_bullet(table, b)
+  del(table, table[b.table_index])
+  for i, x in pairs(table) do
+    x.table_index = i
+  end
+end
+
+--table to remove it from, enemy
+function remove_enemy(table, e)
+  del(table, table[e.table_index])
+  for i, x in pairs(table) do
+    x.table_index = i
+  end
 end
 
 function table_length(t)
@@ -88,28 +215,59 @@ function table_length(t)
   return count
 end
 
-function update_bullet(b)
+function update_bullet(b, table)
   --bounce x
   if not solid_area(b.x + b.dx, b.y, 8, 8, 1) then
     b.x += b.dx
   else
     b.dx *= -1
+    sfx(1)
   end
   --bounce y
   if not solid_area(b.x, b.y + b.dy, 8, 8, 1) then
     b.y += b.dy
   else
     b.dy *= -1
+    sfx(1)
   end
   --remove bullet
   b.alive -= 1
   if b.alive <= 0 then
-    del(bullets, bullets[b.table_index])
-    for i, bb in pairs(bullets) do
-      bb.table_index = i
-    end
+    remove_bullet(table, b)
   end
   return b
+end
+
+function update_enemy(e)
+  --check line dir
+  if not e.dx == 0 then
+    --x axis
+    if e.dx < 0 and e.x < e.x1 then
+     e.dx = e.spd
+    elseif e.dx > 0 and e.x > e.x2 then
+      e.dx = -e.spd
+    end
+  else
+    --y axis
+    if e.dy < 0 and e.y < e.y1 then
+      e.dy = e.spd
+      elseif e.dy > 0 and e.y > e.y2 then
+      e.dy = -e.spd
+    end
+  end
+  --updatepos
+  e.x += e.dx
+  e.y += e.dy
+  --shooting
+  if e.shoot_timer > 0 then
+    e.shoot_timer -= 1
+  else
+    if distance(p1x,p1y,e.x,e.y) <= e.attack_distance then
+      local angle = atan2(p1x - e.x, p1y - e.y)
+      create_bullet(e.x, e.y, angle, 30 * 4, e.bullet_speed, bullets_enemies)
+      e.shoot_timer = e.shoot_time
+    end
+  end
 end
 
 function update_level()
@@ -121,6 +279,7 @@ function update_level()
       map_y=0
       p1x = 24
       p1y = 80
+      create_enemy(96, 48, 0, 1, 40, 0)
     end
   end
   
@@ -142,7 +301,6 @@ function hit(x,y,w,h,f)
   return collide
 end
 
-
 function solid(x, y)
  return fget(mget(x/8+map_x, y/8+map_y)) == 1
 end
@@ -157,9 +315,6 @@ function solid_area(x,y,w,h,d)
   solid(x+d,y+d)
 end
 
-
-
-  
 -- sprite rotation by @fsouchu
 -- rotate a sprite
 -- col 0 is transparent
@@ -195,15 +350,16 @@ end
 
 
 
---player, credit to elastiskalinjen
+---player, credit to elastiskalinjen for dir based movement
 p1angle=0
 p1anglespd = 0.02
 p1speed=0.5
 p1acc=0
 p1x=16
-p1y=16
+p1y=24
 p1dx=0
 p1dy=0
+p1_max_bullets = 4
 
 function update_player()
   --movement
@@ -235,8 +391,8 @@ function update_player()
   p1acc*=0.6
  
   --shooting
-  if btnp(5) and level>0 then
-    create_bullet(p1x, p1y, p1angle, 30 * 6, 2)
+  if btnp(5) and level > 0 and table_length(bullets_player)+1 <= p1_max_bullets then
+    create_bullet(p1x, p1y, p1angle, 30 * 4, 1.5, bullets_player)
   end
 end
 
@@ -314,6 +470,14 @@ cccccffffffffffff4ffccccfff444ffffbf4fffffffffffffffffffffffffffffff556666666666
 cccccffffffffffffffcccccffffffffcfff4ffcffffffffffffffffffffffffffffff56656655f5555fffff655555f51155651161c5615100000000ccc566cc
 cccccccffffffffffcccccccffffffffccffffccffffffffffffffffffffffffffffff565f555ff55fffffff5f555ff5ccc566cccccccccc00000000ccc16ccc
 cccccccccccfffccccccccccffffffffcccfccccfffffffffffffffffffffffffffffff5fff5fffffffffffffff5ffffccc561cccccccccc00000000cccccccc
+00030000003f30000000700000070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0003000003fff3000007333003337000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0036300003333300003763f33f367300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0777770073656370336753ffff357633000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+7365637007777700003763f33f367300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+03333300003630000007333003337000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+03fff300000300000000700000070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+003f3000000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __gff__
 0000000001000000000000000000000001010100010101000000000000000000010101010100010000000000000000000101010101010100000000000000000000000000020202000000000000000000000000000001010100000000000000000000000000010001000000000000000000000000000101010000000000000000
 0000000000020202000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -350,4 +514,5 @@ __map__
 6525252525252525252525252525256700652525252525252525252525252525670000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 3435353535353535353535353535353600343535353535353535353535353535360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
-0002000019050160501405012050100500f0500f0500f0501800016000150001200011000100000e0000d0000d0000c0000b00002000020000100000000000000000000000010000000000000000000000000000
+0002000019020160201402012020100200f0200f0200f0201800016000150001200011000100000e0000d0000d0000c0000b00002000020000100000000000000000000000010000000000000000000000000000
+0002000014720177201e720197200f7200d7200d72000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
