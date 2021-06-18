@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <project version="1">
   <game>
-    <name>Sea Of Stealers</name>
+    <name>Sea Of Ships</name>
     <author>Tymon &amp; Ischa</author>
     <cart>C:\Users\Mr_Sl\AppData\Roaming\pico-8\carts\sos.p8</cart>
   </game>
@@ -13,7 +13,7 @@
   2. </function>
       <function name="todo" enabled="0">todo
 
-  1. 
+  1. all tile walls are the wrong tile
   2. </function>
     </entity>
     <entity name="Game" enabled="1">
@@ -21,7 +21,7 @@
 map_x = 0
 map_y = 0
 game_state = 0
-level = 6
+level = 1
 lives = 3
 score = 0
 has_started_level = false
@@ -62,9 +62,17 @@ function _draw()
   draw_player()
   if game_state == 0 then
     --main
-    rectfill(32, 32, 103, 48, 5)
-    print('sea of ships', 33, 33, 7)
-    print('by tymon &amp; ischa', 33, 41, 7)
+    if not btn(4) then
+      rectfill(32, 32, 103, 48, 5)
+      print('sea of ships', 33, 33, 7)
+      print('by tymon &amp; ischa', 33, 41, 7)
+      rectfill(32, 72, 64, 88, 5)
+      print('move:', 33, 73, 7)
+      print('arrows', 33, 81, 7)
+      rectfill(72, 72, 104, 88, 5)
+      print('shoot:', 73, 73, 7)
+      print('x', 73, 81, 7)
+    end
   elseif game_state == 1 then
     --game
   end
@@ -104,10 +112,17 @@ function check_hit_bullets(index)
       for j, e in pairs(enemies) do
         --if flr(b.x/8) == flr(e.x/8) and flr(b.y/8) == flr(e.y/8) then
         if distance(b.x,b.y,e.x,e.y) &lt; 8 then
-          --delete enemy and bullet cause collision
-          local d = {b=b, e=e}
-          add(todelete,d)
-          score+=1
+          e.hp -= 1
+          if e.hp &lt; 1 then
+            --delete enemy and bullet cause collision
+            local d = {b=b, e=e}
+            add(todelete,d)
+            score+=1
+          else
+            --enemy got hit, remove bullet
+            remove_bullet(bullets_player, bullets_player[b.table_index])
+            break
+          end
         end
       end
     end
@@ -118,7 +133,13 @@ function check_hit_bullets(index)
       remove_enemy(enemies, enemies[d.e.table_index])
     end
   elseif index == 1 then --check enemybullet hit player
-    
+    for i, b in pairs(bullets_enemies) do
+      if distance(b.x,b.y,p1x,p1y) &lt; 8 then
+        -- player hit reset lvl
+        lives -= 1
+        new_level(level)
+      end
+    end
   end
 end
 
@@ -140,18 +161,40 @@ end
 
 --xpos,ypos,dirx,diry,lengthroute,diffeculty
 function create_enemy(x,y,dx,dy,length,diff)
-  local shoot_time = 10
-  local spra = {0,1,2,3}
+  local spra = {128,129,130,131}
+  local shoot_time = 2 * fps
   local hp = 1
   local spd = 1
   local attack_distance = 40
   local bullet_speed = 1.5
   if diff == 0 then
-    shoot_time = 2 * fps
     spra = {128,129,130,131}
+    shoot_time = 2 * fps
     hp = 1
     spd = 1
     attack_distance = 6 * 8
+    bullet_speed = 1.5
+  elseif diff == 1 then
+    spra = {144,145,146,147}
+    shoot_time = 1.9 * fps
+    hp = 2
+    spd = 1
+    attack_distance = 7 * 8
+    bullet_speed = 1.75
+  elseif diff == 2 then
+    spra = {160,161,162,163}
+    shoot_time = 1.8 * fps
+    hp = 2
+    spd = 1.25
+    attack_distance = 9 * 8
+    bullet_speed = 1.4
+  elseif diff == 3 then
+    spra = {176,177,178,179}
+    shoot_time = 1 * fps
+    hp = 1
+    spd = 3
+    attack_distance = 4 * 8
+    bullet_speed = 3
   end
   
   local e = {
@@ -350,6 +393,10 @@ p1dy=0
 p1_max_bullets = 4
 
 function update_player()
+  if lives &lt; 1 then
+    game_over()
+  end
+  
   --movement
   if btn(0) then
     p1angle+=p1anglespd
@@ -429,44 +476,81 @@ function update_level()
       create_enemy(16, 16, 1, 0, 40, 0)
       create_enemy(24, 24, 1, 0, 30, 0)
       create_enemy(88, 48, 0, 1, 40, 0)
-      create_enemy(96, 28, 0, 1, 60, 0)
+      create_enemy(96, 28, 0, 1, 60, 1)
     elseif(level == 4) then
       map_x=64
       map_y=0
       p1x=24
       p1y=96
-      create_enemy(20, 24, 1, 0, 24, 0)
-      create_enemy(80, 24, 1, 0, 24, 0)
-      create_enemy(32, 48, 1, 0, 40, 0)
-      create_enemy(80, 96, 1, 0, 24, 0)
+      create_enemy(20, 24, 1, 0, 24, 1)
+      create_enemy(80, 24, 1, 0, 24, 1)
+      create_enemy(32, 48, 1, 0, 40, 1)
+      create_enemy(80, 96, 1, 0, 24, 2)
     elseif(level == 5) then
       map_x=80
       map_y=0
       p1x=24
       p1y=96
-      create_enemy(60, 24, 1, 0, 40, 0)
-      create_enemy(112, 16, 0, 1, 48, 0)
-      create_enemy(40, 80, 1, 0, 64, 0)
+      create_enemy(60, 24, 1, 0, 40, 1)
+      create_enemy(112, 16, 0, 1, 48, 2)
+      create_enemy(40, 80, 1, 0, 64, 2)
     elseif(level == 6) then
       map_x=96
       map_y=0
       p1x=24
       p1y=96
-      create_enemy(16, 24, 1, 0, 16, 0)
-      create_enemy(48, 24, 1, 0, 24, 0)
-      create_enemy(88, 24, 1, 0, 16, 0)
-      create_enemy(16, 64, 1, 0, 16, 0)
-      create_enemy(88, 64, 1, 0, 16, 0)
+      create_enemy(16, 24, 1, 0, 16, 1)
+      create_enemy(48, 24, 1, 0, 24, 2)
+      create_enemy(88, 24, 1, 0, 16, 2)
+      create_enemy(16, 64, 1, 0, 16, 2)
+      create_enemy(88, 64, 1, 0, 16, 3)
+    elseif(level == 7) then
+      map_x=112
+      map_y=0
+      p1x=24
+      p1y=96
+      create_enemy(16, 24, 1, 0, 16, 3)
+      create_enemy(88, 24, 1, 0, 16, 3)
+      create_enemy(88, 96, 1, 0, 16, 3)
+    elseif(level == 8) then
+      map_x=0
+      map_y=16
+      p1x=16
+      p1y=16
     end
   end
   
   --level update
   --if all enemies dead next level
-  if table_length(enemies) &lt; 1 and level &lt; 8 then
+  if table_length(enemies) &lt; 1 and level &lt; 9 then
     score+=50
     new_level(level + 1)
   end
-end</function>
+end
+
+function game_over()
+  --game reset
+  map_x=0
+  map_y=0
+  level = 1
+  game_state = 0
+  lives = 3
+  score = 0
+  has_started_level = false
+  bullets_player = {}
+  bullets_enemies = {}
+  enemies = {}
+  p1angle=0
+  --player
+  p1anglespd = 0.02
+  p1speed=0.5
+  p1acc=0
+  p1x=16
+  p1y=24
+  p1dx=0
+  p1dy=0
+end  
+  </function>
     </entity>
   </entities>
 </project>
